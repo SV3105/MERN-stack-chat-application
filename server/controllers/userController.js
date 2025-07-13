@@ -1,6 +1,7 @@
 import { generateToken } from "../config/utils";
 import User from "../models/User";
 import bcrypt from "bcrypt"
+import cloudinary from "../config/cloudinary";
 
 export const signup = async () => {
     const {fullName, email, password, bio} = req.body;
@@ -35,10 +36,47 @@ export const login = async (req, res) => {
         const {email, password} = req.body;
         const userData = awaitUser.findOne({email})
 
-        const isPasswordCorrect = await bcrypt.compare(process, userData.password)
+        const isPasswordCorrect = await bcrypt.compare(password, userData.password);
 
+        if(!isPasswordCorrect) {
+            return res.json({success: false, 
+            message: "Invalid credentials"
+            });
+        }
+
+        const token = generateToken(userData._id)
+
+        res.json({success: true, userData, token , message: "Login successfully"})
         
     } catch (error) {
-        
+        console.log(error.message)
+        res.json({success: false, message: error.message})
+    }
+}
+
+export const checkAuth = (req, res) => {
+    res.json({success: true, user: req.user})
+}
+
+export const updateProfile  = async (req, res) => {
+    try {
+        const {profilePic, bio, fullName} = req.body;
+
+        const userId = req.user._id;
+        let updateUser;
+
+        if(!profilePic) {
+           updateUser = await User.findByIdAndUpdate(userId, {bio, fullName}, {new: true})
+        }else{
+            const upload = await cloudinary.uploader.upload(profilePic)
+
+            updateUser = await User.findByIdAndUpdate(userId, {profilePic: upload.secure_url, bio, fullName}, {new: true});
+
+        }
+        res.json({success: true, user: updateUser})
+    } catch (error) 
+    {
+        console.log(error.message)
+        res.json({success: false, message: error.message})
     }
 }
